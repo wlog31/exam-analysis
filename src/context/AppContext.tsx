@@ -2,8 +2,9 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import type { AppSettings, ExamData } from '../types'
 import { parseQuestionInfo } from '../utils/parseQuestionInfo'
 import { parseAnswerSheet } from '../utils/parseAnswerSheet'
+import { parseSubjectiveIrtWorkbook } from '../utils/parseSubjectiveIrt'
 import { buildExamData } from '../utils/analytics'
-import { readExcelRows } from '../services/excel'
+import { readExcelRows, readExcelWorkbook } from '../services/excel'
 
 const SETTINGS_KEY = 'exam_analysis_settings_v2'
 
@@ -15,12 +16,13 @@ function loadSettings(): AppSettings {
       return {
         questionInfoFileName: String(parsed.questionInfoFileName ?? '').trim(),
         answerFileName: String(parsed.answerFileName ?? '').trim(),
+        subjectiveIrtFileName: String(parsed.subjectiveIrtFileName ?? '').trim(),
       }
     }
   } catch {
     // ignore
   }
-  return { questionInfoFileName: '', answerFileName: '' }
+  return { questionInfoFileName: '', answerFileName: '', subjectiveIrtFileName: '' }
 }
 
 interface LoadedFile {
@@ -29,16 +31,25 @@ interface LoadedFile {
   sheetName: string
 }
 
+interface LoadedSubjectiveIrtFile {
+  name: string
+  sheetName: string
+  data: NonNullable<ExamData['subjectiveIrtData']>
+}
+
 interface AppContextValue {
   settings: AppSettings
 
   questionInfoFile: LoadedFile | null
   answerFile: LoadedFile | null
+  subjectiveIrtFile: LoadedSubjectiveIrtFile | null
 
   selectQuestionInfoFile: (file: File) => Promise<void>
   selectAnswerFile: (file: File) => Promise<void>
+  selectSubjectiveIrtFile: (file: File) => Promise<void>
   clearQuestionInfoFile: () => void
   clearAnswerFile: () => void
+  clearSubjectiveIrtFile: () => void
 
   examData: ExamData | null
   loading: boolean
@@ -52,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
   const [questionInfoFile, setQuestionInfoFile] = useState<LoadedFile | null>(null)
   const [answerFile, setAnswerFile] = useState<LoadedFile | null>(null)
+  const [subjectiveIrtFile, setSubjectiveIrtFile] = useState<LoadedSubjectiveIrtFile | null>(null)
   const [examData, setExamData] = useState<ExamData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +108,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const selectSubjectiveIrtFile = useCallback(async (file: File) => {
+    setLoading(true)
+    setError(null)
+    setExamData(null)
+    try {
+      const workbook = await readExcelWorkbook(file)
+      const data = parseSubjectiveIrtWorkbook(workbook, file.name)
+      setSubjectiveIrtFile({
+        name: file.name,
+        sheetName: `${workbook.sheetNames.length}개 시트`,
+        data,
+      })
+      setSettings(prev => {
+        const next = { ...prev, subjectiveIrtFileName: file.name }
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
+        return next
+      })
+    } catch (e) {
+      setSubjectiveIrtFile(null)
+      setError(e instanceof Error ? e.message : '서답형 IRT 파일을 읽는 데 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   const clearQuestionInfoFile = useCallback(() => {
     setQuestionInfoFile(null)
     setExamData(null)
@@ -111,6 +148,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExamData(null)
     setSettings(prev => {
       const next = { ...prev, answerFileName: '' }
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const clearSubjectiveIrtFile = useCallback(() => {
+    setSubjectiveIrtFile(null)
+    setExamData(null)
+    setSettings(prev => {
+      const next = { ...prev, subjectiveIrtFileName: '' }
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
       return next
     })
@@ -141,14 +188,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const data = buildExamData(parsedQ.examInfo, parsedQ.questions, parsedA)
+      const data = buildExamData(parsedQ.examInfo, parsedQ.questions, parsedA, subjectiveIrtFile?.data)
       setExamData(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : '데이터 로드 실패')
     } finally {
       setLoading(false)
     }
-  }, [questionInfoFile, answerFile])
+  }, [questionInfoFile, answerFile, subjectiveIrtFile])
 
   return (
     <AppContext.Provider
@@ -156,10 +203,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         settings,
         questionInfoFile,
         answerFile,
+        subjectiveIrtFile,
         selectQuestionInfoFile,
         selectAnswerFile,
+        selectSubjectiveIrtFile,
         clearQuestionInfoFile,
         clearAnswerFile,
+        clearSubjectiveIrtFile,
         examData,
         loading,
         error,

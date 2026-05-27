@@ -4,6 +4,7 @@ import Header from './components/layout/Header'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import QuestionAnalysis from './pages/QuestionAnalysis'
+import FormalIrtAnalysis from './pages/FormalIrtAnalysis'
 import StudentList from './pages/StudentList'
 import StudentDetail from './pages/StudentDetail'
 import { useApp } from './context/AppContext'
@@ -19,6 +20,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/dashboard" element={<RequireData><Dashboard /></RequireData>} />
               <Route path="/questions" element={<RequireData><QuestionAnalysis /></RequireData>} />
+              <Route path="/irt" element={<RequireData><FormalIrtAnalysis /></RequireData>} />
               <Route path="/students" element={<RequireData><StudentList /></RequireData>} />
               <Route path="/students/:id" element={<RequireData><StudentDetail /></RequireData>} />
             </Routes>

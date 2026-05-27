@@ -5,12 +5,13 @@ const NAV_ITEMS = [
   { to: '/', label: '홈' },
   { to: '/dashboard', label: '대시보드' },
   { to: '/questions', label: '문항분석' },
+  { to: '/irt', label: '전문 IRT' },
   { to: '/students', label: '학생목록' },
 ]
 
 export default function Header() {
   const { pathname } = useLocation()
-  const { examData, questionInfoFile, answerFile } = useApp()
+  const { examData, questionInfoFile, answerFile, subjectiveIrtFile } = useApp()
 
   return (
     <header className="bg-blue-700 text-white shadow-md print:hidden">
@@ -43,7 +44,7 @@ export default function Header() {
           )}
           {(questionInfoFile || answerFile) && !examData && (
             <span className="text-xs text-blue-200 hidden sm:block">
-              {questionInfoFile ? '문항정보표 ✓' : '문항정보표 ✗'}&nbsp;&nbsp;{answerFile ? '정오표 ✓' : '정오표 ✗'}
+              {questionInfoFile ? '문항정보표 ✓' : '문항정보표 ✗'}&nbsp;&nbsp;{answerFile ? '정오표 ✓' : '정오표 ✗'}&nbsp;&nbsp;{subjectiveIrtFile ? '서답형 IRT ✓' : '서답형 IRT 선택'}
             </span>
           )}
         </div>

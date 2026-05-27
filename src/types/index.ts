@@ -60,6 +60,44 @@ export interface IrtSectionSummary {
   note?: string
 }
 
+export interface SubjectiveIrtItemSpec {
+  itemId: string
+  itemType: '단답형' | '서술형' | '기타'
+  contentArea: string
+  achievementStandard: string
+  maxScore: number
+  categoryValues: number[]
+  orderedCategories: boolean
+  modelHint: string
+  includeInIrt: boolean
+  notes: string
+}
+
+export interface SubjectiveIrtCategorySpec {
+  itemId: string
+  categoryScore: number
+  categoryLabel: string
+  rubricDescription: string
+  orderedStep: number
+  interpretationNote: string
+}
+
+export interface SubjectiveIrtStudentScore {
+  studentId: string
+  classNum: string
+  seatNum: string
+  name: string
+  scores: Record<string, number | null>
+}
+
+export interface SubjectiveIrtData {
+  fileName: string
+  items: SubjectiveIrtItemSpec[]
+  categories: SubjectiveIrtCategorySpec[]
+  students: SubjectiveIrtStudentScore[]
+  warnings: string[]
+}
+
 export interface ExamData {
   examInfo: ExamInfo
   questions: Question[]
@@ -72,9 +110,11 @@ export interface ExamData {
     shortAnswer: IrtSectionSummary
     essay?: IrtSectionSummary
   }
+  subjectiveIrtData?: SubjectiveIrtData
 }
 
 export interface AppSettings {
   questionInfoFileName: string
   answerFileName: string
+  subjectiveIrtFileName: string
 }

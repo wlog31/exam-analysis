@@ -10,10 +10,13 @@ export default function Home() {
     settings,
     questionInfoFile,
     answerFile,
+    subjectiveIrtFile,
     selectQuestionInfoFile,
     selectAnswerFile,
+    selectSubjectiveIrtFile,
     clearQuestionInfoFile,
     clearAnswerFile,
+    clearSubjectiveIrtFile,
     loadData,
     loading,
     error,
@@ -36,6 +39,12 @@ export default function Home() {
     e.target.value = ''
   }
 
+  async function handleSubjectiveIrtChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) await handleSubjectiveIrtFile(file)
+    e.target.value = ''
+  }
+
   async function handleQuestionInfoFile(file: File) {
     if (!validateExcelFile(file)) return
     await selectQuestionInfoFile(file)
@@ -46,6 +55,11 @@ export default function Home() {
     await selectAnswerFile(file)
   }
 
+  async function handleSubjectiveIrtFile(file: File) {
+    if (!validateExcelFile(file)) return
+    await selectSubjectiveIrtFile(file)
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
       {/* 상태 헤더 */}
@@ -54,6 +68,7 @@ export default function Home() {
         <div className="flex flex-wrap gap-2 text-sm">
           <StatusBadge ok={!!questionInfoFile} label="문항정보표" />
           <StatusBadge ok={!!answerFile} label="정오표" />
+          <StatusBadge ok={!!subjectiveIrtFile} label="서답형 IRT" optional />
           <StatusBadge ok={!!examData} label="데이터 로드" />
         </div>
         {error && (
@@ -88,6 +103,16 @@ export default function Home() {
           onClear={clearAnswerFile}
           accept={EXCEL_FILE_ACCEPT}
         />
+
+        <FileRow
+          label="서답형 IRT 입력파일"
+          description="선택 사항: 문항_루브릭, 학생_문항점수, 범주_채점기준 시트가 있으면 서답형 다분형 IRT까지 분석"
+          loaded={subjectiveIrtFile}
+          onSelect={handleSubjectiveIrtChange}
+          onDropFile={handleSubjectiveIrtFile}
+          onClear={clearSubjectiveIrtFile}
+          accept={EXCEL_FILE_ACCEPT}
+        />
       </div>
 
       {/* 액션 버튼 */}
@@ -111,11 +136,12 @@ export default function Home() {
       </div>
 
       {/* 최근 파일 이름 표시 (localStorage 기반) */}
-      {(settings.questionInfoFileName || settings.answerFileName) && !questionInfoFile && !answerFile && (
+      {(settings.questionInfoFileName || settings.answerFileName || settings.subjectiveIrtFileName) && !questionInfoFile && !answerFile && !subjectiveIrtFile && (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-xs text-gray-500 space-y-1">
           <p className="font-medium text-gray-600">마지막으로 사용한 파일</p>
           {settings.questionInfoFileName && <p>문항정보표: {settings.questionInfoFileName}</p>}
           {settings.answerFileName && <p>정오표: {settings.answerFileName}</p>}
+          {settings.subjectiveIrtFileName && <p>서답형 IRT: {settings.subjectiveIrtFileName}</p>}
           <p className="text-gray-400 mt-1">※ 새로고침 후에는 파일을 다시 선택해야 합니다.</p>
         </div>
       )}
@@ -123,12 +149,12 @@ export default function Home() {
   )
 }
 
-function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
+function StatusBadge({ ok, label, optional = false }: { ok: boolean; label: string; optional?: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+      ok ? 'bg-green-100 text-green-700' : optional ? 'bg-blue-50 text-blue-500' : 'bg-gray-100 text-gray-500'
     }`}>
-      {ok ? '✓' : '○'} {label}
+      {ok ? '✓' : optional ? '+' : '○'} {label}
     </span>
   )
 }

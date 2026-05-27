@@ -1,4 +1,5 @@
 import type { Question, StudentRecord, QuestionStat, ExamData, ExamInfo } from '../types'
+import type { SubjectiveIrtData } from '../types'
 import type { ParsedAnswerSheet } from './parseAnswerSheet'
 import { isCorrect } from './parseAnswerSheet'
 
@@ -6,6 +7,7 @@ export function buildExamData(
   examInfo: ExamInfo,
   questions: Question[],
   sheet: ParsedAnswerSheet,
+  subjectiveIrtData?: SubjectiveIrtData,
 ): ExamData {
   const { students, mcAnswerKey, subjectiveMode } = sheet
 
@@ -134,6 +136,7 @@ export function buildExamData(
     subjectiveQuestionStats,
     subjectiveMode,
     irtSummary,
+    subjectiveIrtData,
   }
 }
 
