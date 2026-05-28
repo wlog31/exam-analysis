@@ -9,10 +9,10 @@ export default function Home() {
   const {
     settings,
     questionInfoFile,
-    answerFile,
+    answerFiles,
     subjectiveIrtFile,
     selectQuestionInfoFile,
-    selectAnswerFile,
+    selectAnswerFiles,
     selectSubjectiveIrtFile,
     clearQuestionInfoFile,
     clearAnswerFile,
@@ -21,11 +21,13 @@ export default function Home() {
     loading,
     error,
     examData,
+    lastAnalysisSavedAt,
+    clearSavedAnalysis,
   } = useApp()
 
   const navigate = useNavigate()
 
-  const isReady = !!questionInfoFile && !!answerFile
+  const isReady = !!questionInfoFile && answerFiles.length > 0
 
   async function handleQuestionInfoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -34,8 +36,8 @@ export default function Home() {
   }
 
   async function handleAnswerChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) await handleAnswerFile(file)
+    const files = Array.from(e.target.files ?? [])
+    if (files.length > 0) await handleAnswerFiles(files)
     e.target.value = ''
   }
 
@@ -50,9 +52,9 @@ export default function Home() {
     await selectQuestionInfoFile(file)
   }
 
-  async function handleAnswerFile(file: File) {
-    if (!validateExcelFile(file)) return
-    await selectAnswerFile(file)
+  async function handleAnswerFiles(files: File[]) {
+    if (!validateExcelFiles(files)) return
+    await selectAnswerFiles(files)
   }
 
   async function handleSubjectiveIrtFile(file: File) {
@@ -67,13 +69,36 @@ export default function Home() {
         <h1 className="text-xl font-bold text-gray-800">성적 분석 시스템</h1>
         <div className="flex flex-wrap gap-2 text-sm">
           <StatusBadge ok={!!questionInfoFile} label="문항정보표" />
-          <StatusBadge ok={!!answerFile} label="정오표" />
+          <StatusBadge
+            ok={answerFiles.length > 0}
+            label={answerFiles.length > 1 ? `정오표 ${answerFiles.length}개` : '정오표'}
+          />
           <StatusBadge ok={!!subjectiveIrtFile} label="서답형 IRT" optional />
           <StatusBadge ok={!!examData} label="데이터 로드" />
         </div>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">
             {error}
+          </div>
+        )}
+        {examData && questionInfoFile === null && answerFiles.length === 0 && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">마지막 분석 결과를 복원했습니다.</p>
+                <p className="text-xs text-green-700">
+                  {examData.examInfo.subject} · 응시 {examData.students.length}명
+                  {lastAnalysisSavedAt ? ` · 저장 ${formatSavedAt(lastAnalysisSavedAt)}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={clearSavedAnalysis}
+                className="self-start text-xs font-medium text-green-700 underline-offset-2 hover:underline sm:self-auto"
+              >
+                저장된 기록 지우기
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -96,12 +121,13 @@ export default function Home() {
         {/* 정오표 */}
         <FileRow
           label="정오표"
-          description="학생별 선택형 응답 및 서답형 점수가 포함된 파일"
-          loaded={answerFile}
+          description="여러 학급의 정오표 파일을 한 번에 선택하거나 드래그하면 통합 분석합니다"
+          loaded={answerFiles}
           onSelect={handleAnswerChange}
-          onDropFile={handleAnswerFile}
+          onDropFiles={handleAnswerFiles}
           onClear={clearAnswerFile}
           accept={EXCEL_FILE_ACCEPT}
+          multiple
         />
 
         <FileRow
@@ -136,7 +162,7 @@ export default function Home() {
       </div>
 
       {/* 최근 파일 이름 표시 (localStorage 기반) */}
-      {(settings.questionInfoFileName || settings.answerFileName || settings.subjectiveIrtFileName) && !questionInfoFile && !answerFile && !subjectiveIrtFile && (
+      {(settings.questionInfoFileName || settings.answerFileName || settings.subjectiveIrtFileName) && !questionInfoFile && answerFiles.length === 0 && !subjectiveIrtFile && (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-xs text-gray-500 space-y-1">
           <p className="font-medium text-gray-600">마지막으로 사용한 파일</p>
           {settings.questionInfoFileName && <p>문항정보표: {settings.questionInfoFileName}</p>}
@@ -165,9 +191,29 @@ function validateExcelFile(file: File) {
   return false
 }
 
+function validateExcelFiles(files: File[]) {
+  const hasInvalidFile = files.some(file => !isExcelFile(file))
+  if (!hasInvalidFile) return true
+
+  alert('엑셀 파일(.xlsx, .xls)만 올릴 수 있습니다.')
+  return false
+}
+
 function isExcelFile(file: File) {
   const lowerName = file.name.toLowerCase()
   return EXCEL_FILE_EXTENSIONS.some(extension => lowerName.endsWith(extension))
+}
+
+function formatSavedAt(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function FileRow({
@@ -176,18 +222,23 @@ function FileRow({
   loaded,
   onSelect,
   onDropFile,
+  onDropFiles,
   onClear,
   accept,
+  multiple = false,
 }: {
   label: string
   description: string
-  loaded: { name: string; sheetName: string } | null
+  loaded: { name: string; sheetName: string } | { name: string; sheetName: string }[] | null
   onSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onDropFile: (file: File) => Promise<void>
+  onDropFile?: (file: File) => Promise<void>
+  onDropFiles?: (files: File[]) => Promise<void>
   onClear: () => void
   accept: string
+  multiple?: boolean
 }) {
   const [isDragging, setIsDragging] = useState(false)
+  const loadedFiles = Array.isArray(loaded) ? loaded : (loaded ? [loaded] : [])
 
   function handleDragOver(e: React.DragEvent<HTMLLabelElement>) {
     e.preventDefault()
@@ -205,10 +256,18 @@ function FileRow({
     setIsDragging(false)
 
     const files = Array.from(e.dataTransfer.files)
-    const file = files.find(isExcelFile) ?? files[0]
-    if (!file) return
+    if (files.length === 0) return
 
-    await onDropFile(file)
+    if (multiple) {
+      if (!validateExcelFiles(files)) return
+      await onDropFiles?.(files)
+      return
+    }
+
+    const file = files.find(isExcelFile) ?? files[0]
+    if (!file || !validateExcelFile(file)) return
+
+    await onDropFile?.(file)
   }
 
   return (
@@ -216,11 +275,23 @@ function FileRow({
       <label className="block text-sm font-medium text-gray-700">{label}</label>
       <p className="text-xs text-gray-400">{description}</p>
 
-      {loaded ? (
+      {loadedFiles.length > 0 ? (
         <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-          <div>
-            <p className="text-sm font-medium text-green-800">{loaded.name}</p>
-            <p className="text-xs text-green-600">시트: {loaded.sheetName}</p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-green-800">
+              {loadedFiles.length === 1 ? loadedFiles[0].name : `${loadedFiles.length}개 파일 선택됨`}
+            </p>
+            {loadedFiles.length === 1 ? (
+              <p className="text-xs text-green-600">시트: {loadedFiles[0].sheetName}</p>
+            ) : (
+              <div className="mt-0.5 max-h-24 space-y-0.5 overflow-y-auto pr-2">
+                {loadedFiles.map((file, index) => (
+                  <p key={`${file.name}-${file.sheetName}-${index}`} className="truncate text-xs text-green-600">
+                    {file.name} · 시트: {file.sheetName}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -247,6 +318,7 @@ function FileRow({
           <input
             type="file"
             accept={accept}
+            multiple={multiple}
             onChange={onSelect}
             className="hidden"
           />

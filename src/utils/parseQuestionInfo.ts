@@ -1,4 +1,5 @@
 import type { Question, QuestionType, Difficulty, ExamInfo } from '../types'
+import { createExamInfo, extractExamInfoMetadata } from './examMetadata'
 
 // Google Sheets API가 반환하는 2D 배열을 파싱하여 문항정보표를 추출
 export function parseQuestionInfo(rows: string[][]): { examInfo: ExamInfo; questions: Question[] } {
@@ -79,58 +80,7 @@ export function parseQuestionInfo(rows: string[][]): { examInfo: ExamInfo; quest
 }
 
 function extractExamInfo(rows: string[][]): ExamInfo {
-  let subject = '기하'
-  let year = new Date().getFullYear()
-  let semester = 1
-  let examNumber = 1
-  let grade = 2
-  let date = ''
-  let mcTotal = 50
-  let saTotal = 50
-
-  for (const row of rows) {
-    const joined = row.map(c => String(c ?? '')).join(' ')
-
-    if (joined.includes('학년도') && joined.includes('학기')) {
-      const yearMatch = joined.match(/(\d{4})학년도/)
-      const semMatch = joined.match(/(\d)학기/)
-      const examMatch = joined.match(/(\d)차고사/)
-      const gradeMatch = joined.match(/(?:^|\s)(\d)\s*학년(?!도)/)
-      if (yearMatch) year = parseInt(yearMatch[1])
-      if (semMatch) semester = parseInt(semMatch[1])
-      if (examMatch) examNumber = parseInt(examMatch[1])
-      if (gradeMatch) grade = parseInt(gradeMatch[1])
-    }
-    if (joined.includes('고사일자') || (joined.includes('년') && joined.includes('월') && joined.includes('일'))) {
-      const dateMatch = joined.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/)
-      if (dateMatch) date = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`
-    }
-    if (joined.includes('선택형') && joined.includes('점') && (joined.includes('단답형') || joined.includes('서답형'))) {
-      const mcMatch = joined.match(/선택형\s*([\d.]+)\s*점/)
-      const saMatch = joined.match(/(?:단답형|서답형)\s*([\d.]+)\s*점/)
-      if (mcMatch) mcTotal = parseFloat(mcMatch[1])
-      if (saMatch) saTotal = parseFloat(saMatch[1])
-    }
-    // 과목명 추출 (첫 몇 행에서)
-    for (const cell of row) {
-      if (cell.includes('기하') && cell.includes('과목')) subject = '기하'
-      if (cell.includes('수학') && cell.includes('과목')) subject = '수학'
-    }
-  }
-
-  return {
-    subject,
-    year,
-    semester,
-    examNumber,
-    grade,
-    date,
-    totalQuestions: 0,  // 파싱 후 채워짐
-    multipleChoiceCount: 0,
-    shortAnswerCount: 0,
-    multipleChoiceTotal: mcTotal,
-    shortAnswerTotal: saTotal,
-  }
+  return createExamInfo(extractExamInfoMetadata(rows))
 }
 
 function parseQuestionRow(row: string[], num: number, type: QuestionType): Question | null {

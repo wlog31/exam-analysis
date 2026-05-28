@@ -21,6 +21,12 @@ export function buildExamData(
   examInfo.multipleChoiceCount = mcQuestions.length
   examInfo.shortAnswerCount = subjectiveQuestions.length
   examInfo.totalQuestions = questions.length
+  if (!Number.isFinite(examInfo.multipleChoiceTotal) || examInfo.multipleChoiceTotal <= 0) {
+    examInfo.multipleChoiceTotal = mcQuestions.reduce((sum, q) => sum + q.points, 0)
+  }
+  if (!Number.isFinite(examInfo.shortAnswerTotal) || examInfo.shortAnswerTotal <= 0) {
+    examInfo.shortAnswerTotal = subjectiveQuestions.reduce((sum, q) => sum + q.points, 0)
+  }
 
   // 정오표 정답키로 Question.answer 보완
   for (const q of mcQuestions) {

@@ -11,7 +11,8 @@ const NAV_ITEMS = [
 
 export default function Header() {
   const { pathname } = useLocation()
-  const { examData, questionInfoFile, answerFile, subjectiveIrtFile } = useApp()
+  const { examData, questionInfoFile, answerFiles, subjectiveIrtFile } = useApp()
+  const hasAnswerFiles = answerFiles.length > 0
 
   return (
     <header className="bg-blue-700 text-white shadow-md print:hidden">
@@ -42,9 +43,9 @@ export default function Header() {
               {examData.examInfo.subject} {examData.examInfo.year}년도 {examData.examInfo.semester}학기 {examData.examInfo.examNumber}차
             </span>
           )}
-          {(questionInfoFile || answerFile) && !examData && (
+          {(questionInfoFile || hasAnswerFiles) && !examData && (
             <span className="text-xs text-blue-200 hidden sm:block">
-              {questionInfoFile ? '문항정보표 ✓' : '문항정보표 ✗'}&nbsp;&nbsp;{answerFile ? '정오표 ✓' : '정오표 ✗'}&nbsp;&nbsp;{subjectiveIrtFile ? '서답형 IRT ✓' : '서답형 IRT 선택'}
+              {questionInfoFile ? '문항정보표 ✓' : '문항정보표 ✗'}&nbsp;&nbsp;{hasAnswerFiles ? `정오표 ${answerFiles.length}개 ✓` : '정오표 ✗'}&nbsp;&nbsp;{subjectiveIrtFile ? '서답형 IRT ✓' : '서답형 IRT 선택'}
             </span>
           )}
         </div>

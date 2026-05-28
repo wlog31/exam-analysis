@@ -1,4 +1,10 @@
 import type { StudentRecord, AnswerCode } from '../types'
+import {
+  extractExamInfoMetadata,
+  formatMetadataLabel,
+  metadataValueEquals,
+  type ExamInfoMetadata,
+} from './examMetadata'
 
 const MULTIPLE_ANSWER_MAP: Record<string, number[]> = {
   A: [1, 2], B: [1, 3], C: [1, 4], D: [1, 5],
@@ -16,6 +22,12 @@ export interface ParsedAnswerSheet {
   mcPoints: Record<number, number>        // 선택형 배점
   students: StudentRecord[]
   subjectiveMode: 'combined' | 'split'
+  examInfo: ExamInfoMetadata
+}
+
+export interface ParsedAnswerSheetSource {
+  fileName: string
+  sheet: ParsedAnswerSheet
 }
 
 // Google Sheets 2D 배열로부터 정오표를 파싱
@@ -68,7 +80,7 @@ export function parseAnswerSheet(rows: string[][]): ParsedAnswerSheet {
   }
 
   if (headerRowIdx === -1 || questionStartCol === -1) {
-    return { mcAnswerKey: {}, mcPoints: {}, students: [], subjectiveMode: 'combined' }
+    return { ...createEmptyParsedAnswerSheet(), examInfo: extractExamInfoMetadata(rows) }
   }
 
   const headerRow = rows[headerRowIdx]
@@ -221,12 +233,159 @@ export function parseAnswerSheet(rows: string[][]): ParsedAnswerSheet {
     mcPoints,
     students,
     subjectiveMode: hasSplitSubjective ? 'split' : 'combined',
+    examInfo: extractExamInfoMetadata(rows),
   }
+}
+
+export function mergeParsedAnswerSheets(sources: ParsedAnswerSheetSource[]): ParsedAnswerSheet {
+  if (sources.length === 0) return createEmptyParsedAnswerSheet()
+
+  const emptyStudentFiles = sources
+    .filter(({ sheet }) => sheet.students.length === 0)
+    .map(({ fileName }) => fileName)
+  if (emptyStudentFiles.length > 0) {
+    throw new Error(`학생 데이터를 읽지 못한 정오표 파일이 있습니다: ${formatList(emptyStudentFiles)}. 파일 구조를 확인해 주세요.`)
+  }
+
+  const merged = createEmptyParsedAnswerSheet()
+  const subjectiveModes = new Set<ParsedAnswerSheet['subjectiveMode']>()
+  const answerKeyConflicts: string[] = []
+  const pointConflicts: string[] = []
+  const metadataConflicts: string[] = []
+  const duplicatedStudents: string[] = []
+  const seenStudents = new Map<string, string>()
+
+  for (const { fileName, sheet } of sources) {
+    subjectiveModes.add(sheet.subjectiveMode)
+    mergeAnswerKey(merged.mcAnswerKey, sheet.mcAnswerKey, fileName, answerKeyConflicts)
+    mergePoints(merged.mcPoints, sheet.mcPoints, fileName, pointConflicts)
+    mergeExamInfo(merged.examInfo, sheet.examInfo, fileName, metadataConflicts)
+
+    for (const student of sheet.students) {
+      const key = makeStudentIdentityKey(student)
+      const previousFile = seenStudents.get(key)
+      if (previousFile) {
+        duplicatedStudents.push(`${formatStudentIdentity(student)} (${previousFile}, ${fileName})`)
+        continue
+      }
+
+      seenStudents.set(key, fileName)
+      merged.students.push(student)
+    }
+  }
+
+  if (subjectiveModes.size > 1) {
+    throw new Error('정오표 파일의 서답형 구조가 서로 다릅니다. 모든 학급 정오표를 통합형 또는 분리형 중 같은 형식으로 맞춰 주세요.')
+  }
+  if (answerKeyConflicts.length > 0) {
+    throw new Error(`정오표 파일 간 선택형 정답키가 다릅니다: ${formatList(answerKeyConflicts)}.`)
+  }
+  if (pointConflicts.length > 0) {
+    throw new Error(`정오표 파일 간 선택형 배점이 다릅니다: ${formatList(pointConflicts)}.`)
+  }
+  if (metadataConflicts.length > 0) {
+    throw new Error(`정오표 파일 간 시험 정보가 다릅니다: ${formatList(metadataConflicts)}.`)
+  }
+  if (duplicatedStudents.length > 0) {
+    throw new Error(`정오표 파일에 중복 학생이 있습니다: ${formatList(duplicatedStudents)}. 같은 학생이 두 번 포함되면 통합 분석이 왜곡됩니다.`)
+  }
+
+  merged.subjectiveMode = [...subjectiveModes][0] ?? 'combined'
+  return merged
 }
 
 // 학생 응답이 정답인지 여부
 export function isCorrect(answer: AnswerCode, correctAnswer: string): boolean {
   return answer === '.' || answer.trim() === correctAnswer.trim()
+}
+
+function createEmptyParsedAnswerSheet(): ParsedAnswerSheet {
+  return { mcAnswerKey: {}, mcPoints: {}, students: [], subjectiveMode: 'combined', examInfo: {} }
+}
+
+function mergeAnswerKey(
+  target: Record<number, string>,
+  source: Record<number, string>,
+  fileName: string,
+  conflicts: string[],
+) {
+  for (const [questionNumber, rawValue] of Object.entries(source)) {
+    const value = String(rawValue ?? '').trim()
+    if (!value) continue
+
+    const key = Number(questionNumber)
+    const existing = target[key]
+    if (!existing) {
+      target[key] = value
+    } else if (existing !== value) {
+      conflicts.push(`${questionNumber}번: ${existing} ↔ ${value} (${fileName})`)
+    }
+  }
+}
+
+function mergePoints(
+  target: Record<number, number>,
+  source: Record<number, number>,
+  fileName: string,
+  conflicts: string[],
+) {
+  for (const [questionNumber, rawValue] of Object.entries(source)) {
+    const value = Number(rawValue)
+    if (!Number.isFinite(value) || value === 0) continue
+
+    const key = Number(questionNumber)
+    const existing = target[key]
+    if (!existing) {
+      target[key] = value
+    } else if (Math.abs(existing - value) > 0.000001) {
+      conflicts.push(`${questionNumber}번: ${existing}점 ↔ ${value}점 (${fileName})`)
+    }
+  }
+}
+
+function mergeExamInfo(
+  target: ExamInfoMetadata,
+  source: ExamInfoMetadata,
+  fileName: string,
+  conflicts: string[],
+) {
+  for (const [rawKey, rawValue] of Object.entries(source)) {
+    const key = rawKey as keyof ExamInfoMetadata
+    if (rawValue === undefined || rawValue === null || rawValue === '') continue
+
+    const existing = target[key]
+    if (existing === undefined || existing === null || existing === '') {
+      target[key] = rawValue as never
+    } else if (!metadataValueEquals(key, existing as never, rawValue as never)) {
+      conflicts.push(`${formatMetadataLabel(key)}: ${existing} ↔ ${rawValue} (${fileName})`)
+    }
+  }
+}
+
+function makeStudentIdentityKey(student: StudentRecord): string {
+  const studentId = student.studentId.trim()
+  if (studentId) return `studentId:${studentId}`
+
+  const classNum = student.classNum.trim()
+  const seatNum = student.seatNum.trim()
+  if (classNum && seatNum) return `classSeat:${classNum}/${seatNum}`
+
+  return `name:${student.name.trim()}`
+}
+
+function formatStudentIdentity(student: StudentRecord): string {
+  const classSeat = student.classNum && student.seatNum
+    ? `${student.classNum}반 ${student.seatNum}번`
+    : ''
+  const name = student.name.trim()
+  const base = [classSeat, name].filter(Boolean).join(' ')
+  return student.studentId ? `${base || '미상'}(${student.studentId})` : (base || '미상')
+}
+
+function formatList(items: string[], maxItems = 5): string {
+  const visible = items.slice(0, maxItems).join(', ')
+  const hiddenCount = items.length - maxItems
+  return hiddenCount > 0 ? `${visible} 외 ${hiddenCount}건` : visible
 }
 
 function parseScoreCell(cell: string | undefined): number {
