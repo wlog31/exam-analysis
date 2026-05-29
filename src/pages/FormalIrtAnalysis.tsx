@@ -447,23 +447,23 @@ function TeachingGuidanceSection({
         <h3 className="font-semibold text-gray-700">{title}</h3>
         <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-4 divide-y xl:divide-y-0 xl:divide-x divide-gray-100">
-        <GuidanceColumn title="기초학력 지도 영역" emptyText="뚜렷하게 낮은 영역이 없습니다.">
+      <div className="grid grid-cols-1 xl:grid-cols-4 divide-y xl:divide-y-0 xl:divide-x divide-gray-300">
+        <GuidanceColumn title="기초학력 지도 영역" emptyText="뚜렷하게 낮은 영역이 없습니다." headerBg="bg-amber-50" headerText="text-amber-800">
           {summary.areas.map(area => (
             <AreaGuidanceRow key={area.label} area={area} />
           ))}
         </GuidanceColumn>
-        <GuidanceColumn title="기초학력 지도 학생" emptyText="우선 지도 대상이 뚜렷하지 않습니다.">
+        <GuidanceColumn title="기초학력 지도 학생" emptyText="우선 지도 대상이 뚜렷하지 않습니다." headerBg="bg-red-50" headerText="text-red-800">
           {summary.foundationalStudents.map(student => (
             <StudentGuidanceRow key={student.studentId} student={student} />
           ))}
         </GuidanceColumn>
-        <GuidanceColumn title="더 높은 도전 학생" emptyText="심화 도전 대상이 뚜렷하지 않습니다.">
+        <GuidanceColumn title="더 높은 도전 학생" emptyText="심화 도전 대상이 뚜렷하지 않습니다." headerBg="bg-blue-50" headerText="text-blue-800">
           {summary.challengeStudents.map(student => (
             <StudentGuidanceRow key={student.studentId} student={student} />
           ))}
         </GuidanceColumn>
-        <GuidanceColumn title="검토해볼 문항" emptyText="우선 검토 문항이 없습니다.">
+        <GuidanceColumn title="검토해볼 문항" emptyText="우선 검토 문항이 없습니다." headerBg="bg-purple-50" headerText="text-purple-800">
           {summary.reviewItems.map(item => (
             <ItemGuidanceRow key={item.id} item={item} />
           ))}
@@ -477,17 +477,23 @@ function GuidanceColumn({
   title,
   emptyText,
   children,
+  headerBg = 'bg-gray-50',
+  headerText = 'text-gray-700',
 }: {
   title: string
   emptyText: string
   children: ReactNode
+  headerBg?: string
+  headerText?: string
 }) {
   const hasRows = Array.isArray(children) ? children.length > 0 : !!children
 
   return (
-    <div className="p-4">
-      <h4 className="text-sm font-semibold text-gray-700">{title}</h4>
-      <div className="mt-3 space-y-3">
+    <div className="flex flex-col">
+      <div className={`px-4 py-3 border-b border-gray-300 ${headerBg}`}>
+        <h4 className={`text-sm font-semibold ${headerText}`}>{title}</h4>
+      </div>
+      <div className="p-4 space-y-3 flex-1">
         {hasRows ? children : <p className="text-xs text-gray-400 py-3">{emptyText}</p>}
       </div>
     </div>

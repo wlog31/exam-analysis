@@ -181,7 +181,11 @@ function buildItems(questionStats: QuestionStat[], correctAnswers: Record<number
     const correctAnswer = stat.question.answer ?? correctAnswers[stat.questionNumber] ?? ''
     if (!correctAnswer) continue
     const aRaw = stat.irtDiscrimination ?? 0.25
-    const discrimination = clamp(Math.abs(aRaw), 0.15, 1.5)
+    // 음수 변별도 문항은 역방향 문항으로, theta 계산에서 제외
+    if (aRaw < 0) continue
+    // 변별도가 너무 낮은 문항(0.1 미만)도 제외 (Fisher information 불안정)
+    if (aRaw < 0.1) continue
+    const discrimination = clamp(aRaw, 0.15, 1.5)
     const difficulty = clamp(stat.irtDifficulty, -3, 3)
     items.push({
       questionNumber: stat.questionNumber,

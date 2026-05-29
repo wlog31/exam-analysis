@@ -204,6 +204,9 @@ export default function QuestionAnalysis() {
                     </td>
                     <td className="px-3 py-3 text-center text-gray-700 font-mono text-xs">
                       {formatIrt(stat.irtDiscrimination)}
+                      {stat.irtDiscrimination !== null && (stat.irtDiscrimination < 0 || stat.irtDiscrimination < 0.1) && (
+                        <span className="ml-1 text-[10px] text-red-500 font-sans" title="학생 IRT(θ) 계산에서 제외됩니다">IRT제외</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center text-gray-700 font-mono text-xs">
                       {formatIrt(stat.irtDifficulty)}

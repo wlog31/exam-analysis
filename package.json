@@ -14,6 +14,7 @@
     "desktop:build": "npm run build && electron-packager . ExamAnalysis --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"^/(release|\\.github)($|/)\""
   },
   "dependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.60.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
